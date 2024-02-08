@@ -199,8 +199,8 @@ def _convert_bounding_box_format(
 
 def convert_bounding_box_format(
     inpt: torch.Tensor,
-    old_format: Optional[BoundingBoxFormat] = None,
-    new_format: Optional[BoundingBoxFormat] = None,
+    old_format: Optional[BoundingBoxFormat | str] = None,
+    new_format: Optional[BoundingBoxFormat | str] = None,
     inplace: bool = False,
 ) -> torch.Tensor:
     """See :func:`~torchvision.transforms.v2.ConvertBoundingBoxFormat` for details."""
@@ -208,8 +208,23 @@ def convert_bounding_box_format(
     # inputs as well as extract it from `tv_tensors.BoundingBoxes` inputs. However, putting a default value on
     # `old_format` means we also need to put one on `new_format` to have syntactically correct Python. Here we mimic the
     # default error that would be thrown if `new_format` had no default value.
+
+    format_mapping = {
+        "xyxy": BoundingBoxFormat.XYXY,
+        "xywh": BoundingBoxFormat.XYWH,
+        "cxcywh": BoundingBoxFormat.CXCYWH,
+    }
+
     if new_format is None:
         raise TypeError("convert_bounding_box_format() missing 1 required argument: 'new_format'")
+    
+    if isinstance(new_format, str):
+        if new_format.lower() not in format_mapping:
+            raise ValueError(
+                f"Invalid string value {new_format} for `new_format`. "
+                f"It should be one of the followings: 'xyxy', 'xywh' or 'cxcywh'."
+            )
+        new_format = format_mapping[new_format.lower()]
 
     if not torch.jit.is_scripting():
         _log_api_usage_once(convert_bounding_box_format)
@@ -217,6 +232,13 @@ def convert_bounding_box_format(
     if torch.jit.is_scripting() or is_pure_tensor(inpt):
         if old_format is None:
             raise ValueError("For pure tensor inputs, `old_format` has to be passed.")
+        if isinstance(old_format, str):
+            if old_format.lower() not in format_mapping:
+                raise ValueError(
+                    f"Invalid string value {old_format} for `new_format`. "
+                    f"It should be one of the followings: 'xyxy', 'xywh' or 'cxcywh'."
+                )
+            old_format = format_mapping[old_format.lower()]
         return _convert_bounding_box_format(inpt, old_format=old_format, new_format=new_format, inplace=inplace)
     elif isinstance(inpt, tv_tensors.BoundingBoxes):
         if old_format is not None:
